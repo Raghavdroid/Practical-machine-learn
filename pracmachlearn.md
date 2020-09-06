@@ -1,0 +1,102 @@
+---
+title: "Predictions using the given Dataset"
+author: "Raghavandaar"
+output: html_document
+   
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(lattice)
+library(ggplot2)
+library(plyr)
+library(randomForest)
+library(caret)
+library(rpart)
+library(rpart.plot)
+library(corrplot)
+
+```
+
+## Executive Summary
+
+We will try to perform partical machine learning on the dataset
+
+
+
+We will be doing the following:
+
+ Process the data
+ Explore the data
+ Data Modeling and predicting
+
+## Processing
+
+We are going to process the data from the dataset
+```{r}
+trainRaw <- read.csv("pml-training.csv")
+testRaw <- read.csv("pml-testing.csv")
+```
+
+## Exploratory data analyses 
+
+We will try to analyse and explore the data
+```{r}
+dim(trainRaw)
+dim(testRaw)
+```
+A lot of NA values present. Therefore we remove that.
+```{r, cache = T}
+sum(complete.cases(trainRaw))
+```
+```{r, cache = T}
+trainRaw <- trainRaw[, colSums(is.na(trainRaw)) == 0] 
+testRaw <- testRaw[, colSums(is.na(testRaw)) == 0] 
+```  
+```{r, cache = T}
+classe <- trainRaw$classe
+trainRemove <- grepl("^X|timestamp|window", names(trainRaw))
+trainRaw <- trainRaw[, !trainRemove]
+trainCleaned <- trainRaw[, sapply(trainRaw, is.numeric)]
+trainCleaned$classe <- classe
+testRemove <- grepl("^X|timestamp|window", names(testRaw))
+testRaw <- testRaw[, !testRemove]
+testCleaned <- testRaw[, sapply(testRaw, is.numeric)]
+```
+
+```{r, cache = T}
+set.seed(22519) 
+inTrain <- createDataPartition(trainCleaned$classe, p=0.70, list=F)
+trainData <- trainCleaned[inTrain, ]
+testData <- trainCleaned[-inTrain, ]
+```
+
+The data has been explored and cleansed. We now move on to model selection.
+
+## Data Modeling and predicting 
+
+We will try to modify the dataset for model selection using random forest
+
+```{r, cache = T}
+controlRf <- trainControl(method="cv", 5)
+modelRf <- train(classe ~ ., data=trainData, method="rf", trControl=controlRf, ntree=250)
+modelRf
+```
+Performance  and final analysis 
+  
+```{r, cache = T}
+result <- predict(modelRf, testCleaned[, -length(names(testCleaned))])
+result
+```  
+
+
+```{r, cache = T}
+corrPlot <- cor(trainData[, -length(names(trainData))])
+corrplot(corrPlot, method="color")
+```
+
+```{r, cache = T}
+treeModel <- rpart(classe ~ ., data=trainData, method="class")
+prp(treeModel) # fast plot
+```
